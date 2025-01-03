@@ -167,7 +167,6 @@ app.post('/api/change-password', (req, res) => {
   });
 });
 
-// API برای لاگین کاربر
 app.post('/api/login', (req, res) => {
   const { email, password, deviceInfo } = req.body;
 
@@ -182,6 +181,9 @@ app.post('/api/login', (req, res) => {
       return res.status(500).json({ success: false });
     }
     if (results.length > 0) {
+      const user = results[0]; // اولین نتیجه کوئری
+      const userId = user.id; // استخراج ID کاربر
+
       // تغییر وضعیت کاربر به آنلاین
       const updateQuery = 'UPDATE users SET is_online = true, deviceinfo = ? WHERE email = ?';
       db.query(updateQuery, [JSON.stringify(deviceInfo), email], (err, updateResult) => {
@@ -191,12 +193,39 @@ app.post('/api/login', (req, res) => {
         }
 
         // ایجاد توکن JWT
-        const token = jwt.sign({ email }, secretKey, { expiresIn: '1h' });
-        res.status(200).json({ success: true, message: 'ورود موفقیت‌آمیز بود', token });
+        const token = jwt.sign({ email, userId }, secretKey, { expiresIn: '1h' }); // اضافه کردن userId به توکن
+        res.status(200).json({
+          success: true,
+          message: 'ورود موفقیت‌آمیز بود',
+          token,
+          userId, // اضافه کردن userId به پاسخ
+        });
       });
     } else {
       res.status(400).json({ success: false, message: 'ایمیل یا رمز عبور اشتباه است' });
     }
+  });
+});
+
+
+// API برای ذخیره سفارش
+app.post('/api/save-order', (req, res) => {
+  const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod } = req.body;
+
+  // بررسی صحت اطلاعات دریافتی
+  if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod) {
+    return res.status(400).json({ success: false, message: 'لطفا تمام فیلدهای اجباری را پر کنید.' });
+  }
+
+  // ذخیره اطلاعات سفارش در دیتابیس
+  const query = 'INSERT INTO `order` (user_id, order_code, total_price, shipping_address, postal_code, payment_method, shipping_method) VALUES (?, ?, ?, ?, ?, ?, ?)';
+  db.query(query, [userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod], (err, results) => {
+    if (err) {
+      console.error('Error saving order:', err);
+      return res.status(500).json({ success: false, message: 'خطا در ذخیره سفارش' });
+    }
+
+    res.status(200).json({ success: true, message: 'سفارش با موفقیت ذخیره شد', orderId: results.insertId });
   });
 });
 
