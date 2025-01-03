@@ -7,11 +7,11 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const app = express();
 
-// استفاده از middleware برای پردازش داده‌ها
+// Using middleware for data processing
 app.use(cors());
 app.use(bodyParser.json());
 
-// اطلاعات اتصال به دیتابیس MySQL
+// MySQL database connection information
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -27,7 +27,7 @@ db.connect(err => {
   console.log('Connected to MySQL database');
 });
 
-// تنظیمات ارسال ایمیل
+// Email sending settings
 const transporter = nodemailer.createTransport({
   host: 'mail.abzarkhone.com',
   port: 587,
@@ -38,20 +38,20 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// ایجاد یک کد رندم برای تأیید ایمیل
+// Generate a random code for email verification
 const generateVerificationCode = () => {
   return Math.floor(10000 + Math.random() * 90000).toString();
 };
 
-// کلید مخفی برای JWT
+// Secret key for JWT
 const secretKey = 'your-secret-key';
 
-// API برای ارسال کد تأیید
+// API to send verification code
 app.post('/api/send-verification-code', (req, res) => {
   const { email } = req.body;
   const verificationCode = generateVerificationCode();
 
-  // ذخیره کد احراز هویت در دیتابیس
+  // Save the verification code in the database
   const updateQuery = 'UPDATE users SET verification_code = ? WHERE email = ?';
   db.query(updateQuery, [verificationCode, email], (err, results) => {
     if (err) {
@@ -59,7 +59,7 @@ app.post('/api/send-verification-code', (req, res) => {
       return res.status(500).json({ success: false });
     }
 
-    // ارسال ایمیل با کد تأیید
+    // Send email with the verification code
     const mailOptions = {
       from: 'mailing@abzarkhone.com',
       to: email,
@@ -79,18 +79,18 @@ app.post('/api/send-verification-code', (req, res) => {
   });
 });
 
-// API برای ثبت‌نام کاربر
+// API for user registration
 app.post('/api/register', (req, res) => {
   const { email, verificationCode, enteredCode } = req.body;
 
   if (verificationCode !== enteredCode) {
-    return res.status(400).json({ success: false, message: 'کد تأیید اشتباه است' });
+    return res.status(400).json({ success: false, message: 'Verification code is incorrect' });
   }
 
-  // هش کردن enteredCode با استفاده از SHA512
+  // Hash the enteredCode using SHA512
   const hashedCode = crypto.createHash('sha512').update(enteredCode).digest('hex');
 
-  // ذخیره ایمیل و کد هش‌شده در دیتابیس
+  // Save email and hashed code in the database
   const query = 'INSERT INTO users (email, password, password_changed) VALUES (?, ?, false)';
   db.query(query, [email, hashedCode], (err, results) => {
     if (err) {
@@ -98,12 +98,12 @@ app.post('/api/register', (req, res) => {
       return res.status(500).json({ success: false });
     }
 
-    // ارسال ایمیل پس از ثبت‌نام موفقیت‌آمیز
+    // Send email after successful registration
     const mailOptions = {
       from: 'mailing@abzarkhone.com',
       to: email,
-      subject: 'ثبت‌نام موفقیت‌آمیز',
-      text: 'ثبت‌نام شما با موفقیت انجام شد. خوش آمدید!'
+      subject: 'Successful Registration',
+      text: 'You have successfully registered. Welcome!'
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
@@ -114,44 +114,44 @@ app.post('/api/register', (req, res) => {
       }
     });
 
-    res.status(200).json({ success: true, message: 'ثبت نام موفقیت‌آمیز بود' });
+    res.status(200).json({ success: true, message: 'Registration was successful' });
   });
 });
 
-// API برای تغییر رمز عبور
+// API for changing password
 app.post('/api/change-password', (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
 
-  // هش کردن رمز عبور قدیمی
+  // Hash the old password
   const hashedOldPassword = crypto.createHash('sha512').update(oldPassword).digest('hex');
 
-  // بررسی صحت رمز عبور قدیمی
+  // Check the correctness of the old password
   const checkPasswordQuery = 'SELECT * FROM users WHERE email = ? AND password = ?';
   db.query(checkPasswordQuery, [email, hashedOldPassword], (err, results) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'خطا در بررسی رمز عبور' });
+      return res.status(500).json({ success: false, message: 'Error checking password' });
     }
 
     if (results.length === 0) {
-      return res.status(400).json({ success: false, message: 'رمز عبور قدیمی اشتباه است' });
+      return res.status(400).json({ success: false, message: 'Old password is incorrect' });
     }
 
-    // هش کردن رمز عبور جدید
+    // Hash the new password
     const hashedNewPassword = crypto.createHash('sha512').update(newPassword).digest('hex');
 
-    // به‌روزرسانی رمز عبور و وضعیت password_changed
+    // Update the password and password_changed status
     const updatePasswordQuery = 'UPDATE users SET password = ?, password_changed = true WHERE email = ?';
     db.query(updatePasswordQuery, [hashedNewPassword, email], (err, updateResult) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'خطا در تغییر رمز عبور' });
+        return res.status(500).json({ success: false, message: 'Error changing password' });
       }
 
-      // ارسال ایمیل پس از تغییر رمز عبور
+      // Send email after changing the password
       const mailOptions = {
         from: 'mailing@abzarkhone.com',
         to: email,
-        subject: 'تغییر رمز عبور',
-        text: `رمز عبور شما با موفقیت تغییر یافت. رمز عبور جدید شما: ${newPassword}`
+        subject: 'Password Changed',
+        text: `Your password has been successfully changed. Your new password is: ${newPassword}`
       };
 
       transporter.sendMail(mailOptions, (error, info) => {
@@ -162,7 +162,7 @@ app.post('/api/change-password', (req, res) => {
         }
       });
 
-      res.status(200).json({ success: true, message: 'رمز عبور با موفقیت تغییر یافت' });
+      res.status(200).json({ success: true, message: 'Password changed successfully' });
     });
   });
 });
@@ -170,10 +170,10 @@ app.post('/api/change-password', (req, res) => {
 app.post('/api/login', (req, res) => {
   const { email, password, deviceInfo } = req.body;
 
-  // هش کردن رمز وارد شده
+  // Hash the entered password
   const hashedPassword = crypto.createHash('sha512').update(password).digest('hex');
 
-  // بررسی صحت رمز
+  // Check the correctness of the password
   const query = 'SELECT * FROM users WHERE email = ? AND password = ?';
   db.query(query, [email, hashedPassword], (err, results) => {
     if (err) {
@@ -181,10 +181,10 @@ app.post('/api/login', (req, res) => {
       return res.status(500).json({ success: false });
     }
     if (results.length > 0) {
-      const user = results[0]; // اولین نتیجه کوئری
-      const userId = user.id; // استخراج ID کاربر
+      const user = results[0]; // First result of the query
+      const userId = user.id; // Extract user ID
 
-      // تغییر وضعیت کاربر به آنلاین
+      // Change user status to online
       const updateQuery = 'UPDATE users SET is_online = true, deviceinfo = ? WHERE email = ?';
       db.query(updateQuery, [JSON.stringify(deviceInfo), email], (err, updateResult) => {
         if (err) {
@@ -192,46 +192,46 @@ app.post('/api/login', (req, res) => {
           return res.status(500).json({ success: false });
         }
 
-        // ایجاد توکن JWT
-        const token = jwt.sign({ email, userId }, secretKey, { expiresIn: '1h' }); // اضافه کردن userId به توکن
+        // Create JWT token
+        const token = jwt.sign({ email, userId }, secretKey, { expiresIn: '1h' }); // Add userId to the token
         res.status(200).json({
           success: true,
-          message: 'ورود موفقیت‌آمیز بود',
+          message: 'Login successful',
           token,
-          userId, // اضافه کردن userId به پاسخ
+          userId, // Add userId to the response
         });
       });
     } else {
-      res.status(400).json({ success: false, message: 'ایمیل یا رمز عبور اشتباه است' });
+      res.status(400).json({ success: false, message: 'Email or password is incorrect' });
     }
   });
 });
 
-
-// API برای ذخیره سفارش
+// API to save an order
 app.post('/api/save-order', (req, res) => {
   const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, products } = req.body;
 
-  // بررسی صحت اطلاعات دریافتی
+  // Check the correctness of the received data
   if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod || !products) {
-    return res.status(400).json({ success: false, message: 'لطفا تمام فیلدهای اجباری را پر کنید.' });
+    return res.status(400).json({ success: false, message: 'Please fill all required fields.' });
   }
 
-  // تبدیل آرایه محصولات به JSON
+  // Convert products array to JSON
   const productsJSON = JSON.stringify(products);
 
-  // ذخیره اطلاعات سفارش در دیتابیس
+  // Save order information in the database
   const query = 'INSERT INTO `orders` (user_id, order_code, total_price, shipping_address, postal_code, payment_method, shipping_method, products) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
   db.query(query, [userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, productsJSON], (err, results) => {
     if (err) {
       console.error('Error saving order:', err);
-      return res.status(500).json({ success: false, message: 'خطا در ذخیره سفارش' });
+      return res.status(500).json({ success: false, message: 'Error saving order' });
     }
 
-    res.status(200).json({ success: true, message: 'سفارش با موفقیت ذخیره شد', orderId: results.insertId });
+    res.status(200).json({ success: true, message: 'Order saved successfully', orderId: results.insertId });
   });
 });
-// API برای خروج کاربر
+
+// API for user logout
 app.post('/api/logout', (req, res) => {
   const { email } = req.body;
 
@@ -241,33 +241,33 @@ app.post('/api/logout', (req, res) => {
       console.error('Error updating user online status:', err);
       return res.status(500).json({ success: false });
     }
-    res.status(200).json({ success: true, message: 'خروج موفقیت‌آمیز بود' });
+    res.status(200).json({ success: true, message: 'Logout successful' });
   });
 });
 
-// API برای بررسی ایمیل
+// API to check email
 app.post('/api/check-email', (req, res) => {
   const { email } = req.body;
 
-  // بررسی ایمیل در دیتابیس
+  // Check email in the database
   const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
   db.query(checkEmailQuery, [email], (err, results) => {
     if (err) {
       console.error('Error checking email:', err);
-      return res.status(500).json({ success: false, message: 'خطا در بررسی ایمیل' });
+      return res.status(500).json({ success: false, message: 'Error checking email' });
     }
 
     if (results.length > 0) {
-      // اگر ایمیل موجود بود
-      return res.status(400).json({ success: false, message: 'این ایمیل قبلاً ثبت شده است' });
+      // If email exists
+      return res.status(400).json({ success: false, message: 'This email is already registered' });
     }
 
-    // اگر ایمیل موجود نبود
+    // If email does not exist
     res.status(200).json({ success: true });
   });
 });
 
-// API برای دریافت اطلاعات محصولات
+// API to get product information
 app.get('/product', (req, res) => {
   const query = 'SELECT * FROM product';
   db.query(query, (err, results) => {
@@ -278,7 +278,7 @@ app.get('/product', (req, res) => {
   });
 });
 
-// API برای مشاهده کاربران آنلاین
+// API to view online users
 app.get('/api/online-users', (req, res) => {
   const query = 'SELECT email FROM users WHERE is_online = true';
   db.query(query, (err, results) => {
@@ -289,7 +289,7 @@ app.get('/api/online-users', (req, res) => {
   });
 });
 
-// API برای دریافت اطلاعات کاربران
+// API to get user information
 app.get('/UserLogindata', (req, res) => {
   const query = 'SELECT * FROM users';
   db.query(query, (err, results) => {
@@ -300,11 +300,11 @@ app.get('/UserLogindata', (req, res) => {
   });
 });
 
-// API برای بررسی کد احراز هویت و تغییر رمز عبور
+// API to verify verification code and reset password
 app.post('/api/verify-and-reset-password', (req, res) => {
   const { email, verificationCode, newPassword } = req.body;
 
-  // بررسی صحت کد احراز هویت
+  // Check the correctness of the verification code
   const checkCodeQuery = 'SELECT * FROM users WHERE email = ? AND verification_code = ?';
   db.query(checkCodeQuery, [email, verificationCode], (err, results) => {
     if (err) {
@@ -316,15 +316,15 @@ app.post('/api/verify-and-reset-password', (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid verification code.' });
     }
 
-    // بررسی شرایط رمز عبور جدید
+    // Check new password conditions
     if (!newPassword || newPassword.length < 9 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
       return res.status(400).json({ success: false, message: 'Password must be at least 9 characters long and include one uppercase letter, one lowercase letter, and one number.' });
     }
 
-    // هش کردن رمز عبور جدید
+    // Hash the new password
     const hashedNewPassword = crypto.createHash('sha512').update(newPassword).digest('hex');
 
-    // به‌روزرسانی رمز عبور و پاک کردن کد احراز هویت
+    // Update the password and clear the verification code
     const updatePasswordQuery = 'UPDATE users SET password = ?, verification_code = NULL WHERE email = ?';
     db.query(updatePasswordQuery, [hashedNewPassword, email], (err, updateResult) => {
       if (err) {
@@ -337,7 +337,7 @@ app.post('/api/verify-and-reset-password', (req, res) => {
   });
 });
 
-// شروع سرور
+// Start the server
 app.listen(5000, () => {
   console.log('Server is running on port 5000');
 });
