@@ -210,16 +210,19 @@ app.post('/api/login', (req, res) => {
 
 // API برای ذخیره سفارش
 app.post('/api/save-order', (req, res) => {
-  const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod } = req.body;
+  const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, products } = req.body;
 
   // بررسی صحت اطلاعات دریافتی
-  if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod) {
+  if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod || !products) {
     return res.status(400).json({ success: false, message: 'لطفا تمام فیلدهای اجباری را پر کنید.' });
   }
 
+  // تبدیل آرایه محصولات به JSON
+  const productsJSON = JSON.stringify(products);
+
   // ذخیره اطلاعات سفارش در دیتابیس
-  const query = 'INSERT INTO `order` (user_id, order_code, total_price, shipping_address, postal_code, payment_method, shipping_method) VALUES (?, ?, ?, ?, ?, ?, ?)';
-  db.query(query, [userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod], (err, results) => {
+  const query = 'INSERT INTO `orders` (user_id, order_code, total_price, shipping_address, postal_code, payment_method, shipping_method, products) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+  db.query(query, [userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, productsJSON], (err, results) => {
     if (err) {
       console.error('Error saving order:', err);
       return res.status(500).json({ success: false, message: 'خطا در ذخیره سفارش' });
@@ -228,7 +231,6 @@ app.post('/api/save-order', (req, res) => {
     res.status(200).json({ success: true, message: 'سفارش با موفقیت ذخیره شد', orderId: results.insertId });
   });
 });
-
 // API برای خروج کاربر
 app.post('/api/logout', (req, res) => {
   const { email } = req.body;
