@@ -246,6 +246,31 @@ app.post('/api/logout', (req, res) => {
 });
 
 // API to check email
+app.post('/api/check-email-for-forgot-pass', (req, res) => {
+  const { email } = req.body;
+
+  // Check email in the database
+  const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
+  db.query(checkEmailQuery, [email], (err, results) => {
+    if (err) {
+      console.error('Error checking email:', err);
+      return res.status(500).json({ success: false, message: 'Error checking email' });
+    }
+
+    if (results.length > 0) {
+      // If email exists
+      return res.status(200).json({ success: true});
+    }
+
+    // If email does not exist
+    res.status(400).json({ success: false , message: 'This email is not exist' });
+  });
+});
+
+
+
+
+// API to check email
 app.post('/api/check-email', (req, res) => {
   const { email } = req.body;
 
