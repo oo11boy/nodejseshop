@@ -29,12 +29,12 @@ db.connect(err => {
 
 // Email sending settings
 const transporter = nodemailer.createTransport({
-  host: 'mail.abzarkhone.com',
-  port: 587,
-  secure: false,
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure:true,
   auth: {
-    user: 'mailing@abzarkhone.com',
-    pass: 'Ra13781379'
+    user: 'rswlq2503@gmail.com',
+    pass: 'uyjw rpvn sqni yssg'
   }
 });
 
@@ -61,7 +61,7 @@ app.post('/api/send-verification-code', (req, res) => {
 
     // Send email with the verification code
     const mailOptions = {
-      from: 'mailing@abzarkhone.com',
+      from: '"shopping" <rswlq2503@gmail.com>',
       to: email,
       subject: 'Password Reset Verification Code',
       text: `Your verification code is: ${verificationCode}`,
@@ -100,7 +100,7 @@ app.post('/api/register', (req, res) => {
 
     // Send email after successful registration
     const mailOptions = {
-      from: 'mailing@abzarkhone.com',
+      from: '"shopping" <rswlq2503@gmail.com>',
       to: email,
       subject: 'Successful Registration',
       text: 'You have successfully registered. Welcome!'
@@ -148,7 +148,7 @@ app.post('/api/change-password', (req, res) => {
 
       // Send email after changing the password
       const mailOptions = {
-        from: 'mailing@abzarkhone.com',
+          from: '"shopping" <rswlq2503@gmail.com>',
         to: email,
         subject: 'Password Changed',
         text: `Your password has been successfully changed. Your new password is: ${newPassword}`
