@@ -91,7 +91,7 @@ app.post('/api/register', (req, res) => {
   const hashedCode = crypto.createHash('sha512').update(enteredCode).digest('hex');
 
   // Save email and hashed code in the database
-  const query = 'INSERT INTO users (email, password, password_changed) VALUES (?, ?, false)';
+  const query = 'INSERT INTO users (email, password, password_changed ,is_online) VALUES (?, ?, false ,true)';
   db.query(query, [email, hashedCode], (err, results) => {
     if (err) {
       console.error('Error inserting user:', err);
