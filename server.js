@@ -247,10 +247,10 @@ app.post('/api/login', (req, res) => {
 
 // API to save an order
 app.post('/api/save-order', (req, res) => {
-  const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, products } = req.body;
+  const { userId, orderCode, totalPrice, shippingAddress, postalCode, paymentMethod, shippingMethod, products, email } = req.body;
 
   // Check the correctness of the received data
-  if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod || !products) {
+  if (!userId || !orderCode || !totalPrice || !shippingAddress || !postalCode || !paymentMethod || !shippingMethod || !products || !email) {
     return res.status(400).json({ success: false, message: 'Please fill all required fields.' });
   }
 
@@ -265,10 +265,25 @@ app.post('/api/save-order', (req, res) => {
       return res.status(500).json({ success: false, message: 'Error saving order' });
     }
 
+    // Send email with order confirmation
+    const mailOptions = {
+      from: '"shopping" <rswlq2503@gmail.com>',
+      to: email,
+      subject: 'Order Confirmation',
+      text: `Your order has been successfully placed. Your order code is: ${orderCode}`
+    };
 
-      res.status(200).json({ success: true, message: 'Order saved successfully', orderId: results.insertId });
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error('Error sending email:', error);
+        return res.status(500).json({ success: false, message: 'Error sending email' });
+      } else {
+        console.log('Email sent: ' + info.response);
+        return res.status(200).json({ success: true, message: 'Order saved successfully', orderId: results.insertId });
+      }
     });
   });
+});
 
 
 // API for user logout
