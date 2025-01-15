@@ -79,7 +79,21 @@ app.post('/api/send-verification-code', (req, res) => {
   });
 });
 
-// API for user registration
+// Generate discount code
+const generateDiscountCode = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; 
+  let discountCode = '';
+  const codeLength = 4; 
+
+  for (let i = 0; i < codeLength; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    discountCode += characters[randomIndex];
+  }
+
+  return discountCode;
+};
+
+// API to register user and send discount code
 app.post('/api/register', (req, res) => {
   const { email, verificationCode, enteredCode } = req.body;
 
@@ -87,23 +101,23 @@ app.post('/api/register', (req, res) => {
     return res.status(400).json({ success: false, message: 'Verification code is incorrect' });
   }
 
-  // Hash the enteredCode using SHA512
   const hashedCode = crypto.createHash('sha512').update(enteredCode).digest('hex');
+  const discountCode = generateDiscountCode();
 
-  // Save email and hashed code in the database
-  const query = 'INSERT INTO users (email, password, password_changed ,is_online) VALUES (?, ?, false ,true)';
-  db.query(query, [email, hashedCode], (err, results) => {
+  const query = 'INSERT INTO users (email, password, discount_code, password_changed, is_online) VALUES (?, ?, ?, false, true)';
+  db.query(query, [email, hashedCode, discountCode], (err, results) => {
     if (err) {
       console.error('Error inserting user:', err);
       return res.status(500).json({ success: false });
     }
 
-    // Send email after successful registration
+    const userId = results.insertId; // Get the inserted user's ID
+
     const mailOptions = {
       from: '"shopping" <rswlq2503@gmail.com>',
       to: email,
       subject: 'Successful Registration',
-      text: 'You have successfully registered. Welcome!'
+      text: `You have successfully registered. Welcome! Your discount code is: ${discountCode}`
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
@@ -114,10 +128,34 @@ app.post('/api/register', (req, res) => {
       }
     });
 
-    res.status(200).json({ success: true, message: 'Registration was successful' });
+    res.status(200).json({ success: true, message: 'Registration was successful', discountCode, userId }); // Return userId to the client
   });
 });
 
+// API to use discount code
+app.post('/api/use-discount', (req, res) => {
+  const { email, discountCode } = req.body;
+
+  const checkDiscountQuery = 'SELECT * FROM users WHERE email = ? AND discount_code = ? AND discount_used = FALSE';
+  db.query(checkDiscountQuery, [email, discountCode], (err, results) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Error checking discount code' });
+    }
+
+    if (results.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid or already used discount code' });
+    }
+
+    const updateDiscountQuery = 'UPDATE users SET discount_used = TRUE WHERE email = ? AND discount_code = ?';
+    db.query(updateDiscountQuery, [email, discountCode], (err, updateResult) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: 'Error updating discount code status' });
+      }
+
+      res.status(200).json({ success: true, message: 'Discount code applied successfully' });
+    });
+  });
+});
 // API for changing password
 app.post('/api/change-password', (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
@@ -227,9 +265,11 @@ app.post('/api/save-order', (req, res) => {
       return res.status(500).json({ success: false, message: 'Error saving order' });
     }
 
-    res.status(200).json({ success: true, message: 'Order saved successfully', orderId: results.insertId });
+
+      res.status(200).json({ success: true, message: 'Order saved successfully', orderId: results.insertId });
+    });
   });
-});
+
 
 // API for user logout
 app.post('/api/logout', (req, res) => {
